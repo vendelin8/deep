@@ -9,12 +9,15 @@ import (
 	"log"
 	"reflect"
 	"strings"
+	"time"
 )
 
 var (
 	// FloatPrecision is the number of decimal places to round float values
 	// to when comparing.
 	FloatPrecision = 10
+
+	TimePrecision time.Duration
 
 	// MaxDiff specifies the maximum number of differences to return.
 	MaxDiff = 10
@@ -79,7 +82,11 @@ type cmp struct {
 	flag        map[byte]bool
 }
 
-var errorType = reflect.TypeOf((*error)(nil)).Elem()
+var (
+	errorType    = reflect.TypeOf((*error)(nil)).Elem()
+	timeType     = reflect.TypeOf(time.Time{})
+	durationType = reflect.TypeOf(time.Nanosecond)
+)
 
 // Equal compares variables a and b, recursing into their structure up to
 // MaxDepth levels deep (if greater than zero), and returns a list of differences,
@@ -220,6 +227,21 @@ func (c *cmp) equals(a, b reflect.Value, level int) {
 
 			Iterate through the fields (FirstName, LastName), recurse into their values.
 		*/
+
+		if TimePrecision > 0 {
+			switch aType {
+			case timeType, durationType:
+				aFunc := a.MethodByName("Truncate")
+				bFunc := a.MethodByName("Truncate")
+
+				if aFunc.CanInterface() && bFunc.CanInterface() {
+					precision := reflect.ValueOf(TimePrecision)
+
+					a = aFunc.Call([]reflect.Value{precision})[0]
+					b = bFunc.Call([]reflect.Value{precision})[0]
+				}
+			}
+		}
 
 		// Types with an Equal() method, like time.Time, only if struct field
 		// is exported (CanInterface)
