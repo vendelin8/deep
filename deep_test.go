@@ -14,6 +14,12 @@ import (
 	v2 "github.com/go-test/deep/test/v2"
 )
 
+const (
+	multilineTestError = `wrong diff:
+	got:      %q
+	expected: %q`
+)
+
 func TestString(t *testing.T) {
 	diff := deep.Equal("foo", "foo")
 	if len(diff) > 0 {
@@ -1184,6 +1190,43 @@ func TestTimeUnexported(t *testing.T) {
 	}
 }
 
+func TestTimePrecision(t *testing.T) {
+	restoreTimePrecision := deep.TimePrecision
+	t.Cleanup(func() { deep.TimePrecision = restoreTimePrecision })
+
+	deep.TimePrecision = 1 * time.Microsecond
+
+	now := time.Date(2009, 11, 10, 23, 0, 0, 0, time.UTC)
+	later := now.Add(123 * time.Nanosecond)
+
+	shouldBeEqual(t, deep.Equal(now, later))
+
+	d1 := 1 * time.Microsecond
+	d2 := d1 + 123*time.Nanosecond
+
+	shouldBeEqual(t, deep.Equal(d1, d2))
+
+	restoreCompareUnexportedFields := deep.CompareUnexportedFields
+	t.Cleanup(func() { deep.CompareUnexportedFields = restoreCompareUnexportedFields })
+
+	deep.CompareUnexportedFields = true
+
+	type S struct {
+		t time.Time
+		d time.Duration
+	}
+
+	s1 := &S{t: now, d: d1}
+	s2 := &S{t: later, d: d2}
+
+	// Since we cannot call `Truncate` on the unexported fields,
+	// we will show differences here.
+	shouldBeDiffs(t, deep.Equal(s1, s2),
+		"t.wall: 0 != 123",
+		"d: 1000 != 1123",
+	)
+}
+
 func TestInterface(t *testing.T) {
 	a := map[string]interface{}{
 		"foo": map[string]string{
@@ -1611,5 +1654,53 @@ func TestNilPointersAreZero(t *testing.T) {
 	diff = deep.Equal(a, b)
 	if len(diff) != 1 {
 		t.Fatalf("expected 1 diff, got %d: %s", len(diff), diff)
+	}
+}
+
+func reportWrongDiff(t testing.TB, got, expect string) {
+	t.Helper()
+
+	output := fmt.Sprintf("wrong diff: got %q, expected %q", got, expect)
+	if len(output) > 120 {
+		output = fmt.Sprintf(multilineTestError, got, expect)
+	}
+
+	t.Error(output)
+}
+
+func shouldBeDiffs(t testing.TB, diff []string, head string, tail ...string) {
+	t.Helper()
+
+	if len(diff) == 0 {
+		t.Fatal("no diffs")
+	}
+
+	if len(diff) != len(tail)+1 {
+		t.Log("diff:", diff)
+		t.Errorf("wrong number of diffs: got %d, expected %d", len(diff), len(tail)+1)
+	}
+
+	if expect := head; diff[0] != expect {
+		reportWrongDiff(t, diff[0], expect)
+	}
+
+	for i, expect := range tail {
+		if i+1 >= len(diff) {
+			t.Errorf("missing diff: %q", expect)
+			continue
+		}
+
+		if got := diff[i+1]; got != expect {
+			reportWrongDiff(t, got, expect)
+		}
+
+	}
+}
+
+func shouldBeEqual(t testing.TB, diff []string) {
+	t.Helper()
+
+	if len(diff) > 0 {
+		t.Errorf("should be equal: %q", diff)
 	}
 }
