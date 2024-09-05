@@ -9,9 +9,9 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/go-test/deep"
-	v1 "github.com/go-test/deep/test/v1"
-	v2 "github.com/go-test/deep/test/v2"
+	"github.com/vendelin8/deep"
+	v1 "github.com/vendelin8/deep/test/v1"
+	v2 "github.com/vendelin8/deep/test/v2"
 )
 
 const (
@@ -157,7 +157,7 @@ func TestTypeMismatch(t *testing.T) {
 	if len(diff) != 1 {
 		t.Error("too many diff:", diff)
 	}
-	if diff[0] != "github.com/go-test/deep/test/v1.Error != github.com/go-test/deep/test/v2.Error" {
+	if diff[0] != "github.com/vendelin8/deep/test/v1.Error != github.com/vendelin8/deep/test/v2.Error" {
 		t.Error("wrong diff:", diff[0])
 	}
 }
